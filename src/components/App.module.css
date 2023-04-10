@@ -1,0 +1,22 @@
+.App {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-gap: 16px;
+  padding-bottom: 24px;
+}
+
+.loaderWrapT {
+  position: relative;
+  top: 250%;
+  left: 47%;
+
+  transform: translateX(-50%, -50%);
+}
+
+.loaderWrapB {
+  position: relative;
+  bottom: 450%;
+  left: 47%;
+
+  transform: translateX(-50%, -50%);
+}
