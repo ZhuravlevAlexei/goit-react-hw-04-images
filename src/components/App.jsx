@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import css from './App.module.css';
 import { getPhotosByAxios } from 'services/library';
@@ -15,28 +15,21 @@ const STATUS_STAGE = {
   REJECTED: 'rejected',
 };
 
-class App extends Component {
-  state = {
-    searchText: '',
-    STATUS: STATUS_STAGE.IDLE,
-    gallery: [],
-    paginationPage: 0,
-    totalHits: 0,
-    showModal: false,
-    picObjectForModal: { picUrl: '', picTags: '' },
-  };
+const App = () => {
+  const [searchText, setSearchText] = useState('');
+  const [status, setStatus] = useState(STATUS_STAGE.IDLE);
+  const [gallery, setGallery] = useState([]);
+  const [paginationPage, setPaginationPage] = useState(0);
+  const [totalHits, setTotalHits] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [picUrl, setPicUrl] = useState('');
+  const [picTags, setPicTags] = useState('');
 
-  componentDidUpdate(prevProps, prevState) {
-    const prevSearch = prevState.searchText;
-    const newSearch = this.state.searchText.trim();
-    const prevPage = prevState.paginationPage;
-    const newPage = this.state.paginationPage;
-    const newGallery = this.state.gallery;
-
-    if (newGallery.length !== 0) {
-      if (newPage === 1) {
+  useEffect(() => {
+    if (gallery.length !== 0) {
+      if (paginationPage === 1) {
         window.scrollTo(0, 0);
-      } else if (newPage > 1) {
+      } else if (paginationPage > 1) {
         const galleryElement = document.querySelector('#forScroll');
         const { height: cardHeight } =
           galleryElement.firstElementChild.getBoundingClientRect();
@@ -47,101 +40,77 @@ class App extends Component {
         });
       }
     }
+  }, [gallery, paginationPage]);
 
-    if (!newSearch) {
+  useEffect(() => {
+    if (!searchText) {
       return;
     }
-
-    if (prevSearch !== newSearch || prevPage !== newPage) {
-      this.setState({ STATUS: STATUS_STAGE.PENDING });
-      getPhotosByAxios(newSearch, this.state.paginationPage)
-        .then(resp => {
-          if (resp.status !== 200) {
-            throw new Error(resp.statusText);
-          } else {
-            if (prevSearch !== newSearch) {
-              this.setState({
-                STATUS: STATUS_STAGE.RESOLVED,
-                gallery: [...resp.data.hits],
-                totalHits: resp.data.totalHits,
-              });
-            } else {
-              this.setState(({ gallery }) => ({
-                STATUS: STATUS_STAGE.RESOLVED,
-                gallery: [...gallery, ...resp.data.hits],
-                totalHits: resp.data.totalHits,
-              }));
-            }
+    setStatus(STATUS_STAGE.PENDING);
+    getPhotosByAxios(searchText, paginationPage)
+      .then(resp => {
+        if (resp.status !== 200) {
+          throw new Error(resp.statusText);
+        } else {
+          setStatus(STATUS_STAGE.RESOLVED);
+          setTotalHits(resp.data.totalHits);
+          if (paginationPage === 1) {
+            setGallery(gallery => [...resp.data.hits]);
+          } else if (paginationPage > 1) {
+            setGallery(gallery => [...gallery, ...resp.data.hits]);
           }
-        })
-        .catch(error => {
-          console.error(error);
-        })
-        .finally(() => {
-          this.setState({ STATUS: STATUS_STAGE.IDLE });
-        });
-    }
-  }
+        }
+      })
+      .catch(error => {
+        console.error(error);
+      })
+      .finally(() => {
+        setStatus(STATUS_STAGE.IDLE);
+      });
+  }, [searchText, paginationPage]);
 
-  createSearchText = searchText => {
-    this.setState({
-      searchText,
-      STATUS: STATUS_STAGE.IDLE,
-      paginationPage: 1,
-    });
+  const createSearchText = searchText => {
+    setSearchText(searchText.trim());
+    setStatus(STATUS_STAGE.IDLE);
+    setPaginationPage(1);
   };
 
-  onLoadMore = () => {
-    this.setState(prev => ({
-      paginationPage: prev.paginationPage + 1,
-    }));
+  const onLoadMore = () => {
+    setPaginationPage(paginationPage + 1);
   };
 
-  onCloseModal = () => {
-    this.setState(prev => ({ showModal: false }));
+  const onCloseModal = () => {
+    setShowModal(false);
   };
 
-  onOpenModal = picObject => {
-    this.setState({
-      showModal: true,
-      picObjectForModal: {
-        picUrl: picObject.picUrl,
-        picTags: picObject.picTags,
-      },
-    });
+  const onOpenModal = picObject => {
+    setShowModal(true);
+    setPicUrl(picObject.picUrl);
+    setPicTags(picObject.picTags);
   };
 
-  render() {
-    const { gallery, totalHits, paginationPage, STATUS, showModal } =
-      this.state;
-    const totalPages = Math.ceil(totalHits / 12);
+  const totalPages = Math.ceil(totalHits / 12);
 
-    return (
-      <div className={css.App}>
-        <Searchbar onSubmit={this.createSearchText} />
-        <ImageGallery gallery={gallery} onOpenModal={this.onOpenModal} />
-        {gallery.length !== 0 && paginationPage < totalPages && (
-          <Button onClick={this.onLoadMore} />
-        )}
-        {STATUS === STATUS_STAGE.PENDING && (
-          <div
-            className={paginationPage > 1 ? css.loaderWrapB : css.loaderWrapT}
-          >
-            <Loader />
-          </div>
-        )}
-        {showModal && (
-          <Modal onClose={this.onCloseModal}>
-            <img
-              src={this.state.picObjectForModal.picUrl}
-              alt={this.state.picObjectForModal.picTags}
-            />
-          </Modal>
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <div className={css.App}>
+      <Searchbar onSubmit={createSearchText} />
+      <ImageGallery gallery={gallery} onOpenModal={onOpenModal} />
+      {gallery.length !== 0 && paginationPage < totalPages && (
+        <Button onClick={onLoadMore} />
+      )}
+      {status === STATUS_STAGE.PENDING && (
+        <div className={paginationPage > 1 ? css.loaderWrapB : css.loaderWrapT}>
+          <Loader />
+        </div>
+      )}
+      {showModal && (
+        <Modal onClose={onCloseModal}>
+          <img src={picUrl} alt={picTags} />
+        </Modal>
+      )}
+    </div>
+  );
+};
 
 App.propTypes = {
   searchText: PropTypes.string,
